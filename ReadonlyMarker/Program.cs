@@ -8,12 +8,12 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ReadonlyMarker
 {
-    public class Program
+    public class Program    
     {
         public static int Counter = 0;
         public static void Main(string[] args)
         {
-            var path = "D:\\Development\\VisualStudio\\OpenSource\\runtime\\src\\libraries";
+            var path = "D:\\Development\\TestSanbox";
             foreach (String file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories))
             {
                 CheckFile(file);
@@ -27,11 +27,11 @@ namespace ReadonlyMarker
             var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(filePath));
             var structVisitor = new StructVisitor();
             structVisitor.Visit(tree.GetRoot());
-            if(structVisitor.NonReadoblyStructs.Count == 0)
+            if(structVisitor.NonReadonlyStructs.Count == 0)
                 return;
 
             var methodsVisitor = new NonReadonlyStructMethodsVisitor();
-            methodsVisitor.Visit(structVisitor.NonReadoblyStructs[0]);
+            methodsVisitor.Visit(structVisitor.NonReadonlyStructs[0]);
             if(methodsVisitor.NonReadonlyMethods.Count == 0)
                 return;
 

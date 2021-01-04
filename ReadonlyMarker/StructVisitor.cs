@@ -7,14 +7,14 @@ namespace ReadonlyMarker
 {
     public class StructVisitor : CSharpSyntaxWalker
     {
-        public List<StructDeclarationSyntax> NonReadoblyStructs = new List<StructDeclarationSyntax>();
+        public readonly List<StructDeclarationSyntax> NonReadonlyStructs = new List<StructDeclarationSyntax>();
 
         public override void VisitStructDeclaration(StructDeclarationSyntax node)
         {
             if (node.Modifiers.Any(k => k.ValueText == "readonly"))
                 return;
 
-            NonReadoblyStructs.Add(node);
+            NonReadonlyStructs.Add(node);
         }
     }
 }
