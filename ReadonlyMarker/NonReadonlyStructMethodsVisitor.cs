@@ -10,6 +10,7 @@ namespace ReadonlyMarker
     {
         public readonly List<MethodDeclarationSyntax> NonReadonlyMethods = new List<MethodDeclarationSyntax>();
         public readonly List<AccessorDeclarationSyntax> NonReadonlyGetters = new List<AccessorDeclarationSyntax>();
+        public int MethodCount => NonReadonlyGetters.Count + NonReadonlyMethods.Count;
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
             if (node.Modifiers.Any(k => k.ValueText == "readonly" || k.ValueText == "static"))

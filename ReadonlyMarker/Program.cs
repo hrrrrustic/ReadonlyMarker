@@ -8,36 +8,23 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ReadonlyMarker
 {
-    public class Program    
+    public class Program
     {
-        public static int Counter = 0;
         public static void Main(string[] args)
         {
-            var path = "D:\\Development\\TestSanbox";
+            var path = "D:\\Development\\VisualStudio\\OpenSource\\runtime\\src\\libraries";
+            var Counter = 0;
             foreach (String file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories))
             {
-                CheckFile(file);
+                if(file.Contains("\\ref\\"))
+                    continue;
+
+                var checker = new ReadonlyChecker(file);
+                checker.CheckFile();
+                Counter += checker.MethodCount;
             }
 
             Console.WriteLine(Counter);
-        }
-
-        private static void CheckFile(string filePath)
-        {
-            var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(filePath));
-            var structVisitor = new StructVisitor();
-            structVisitor.Visit(tree.GetRoot());
-            if(structVisitor.NonReadonlyStructs.Count == 0)
-                return;
-
-            var methodsVisitor = new NonReadonlyStructMethodsVisitor();
-            methodsVisitor.Visit(structVisitor.NonReadonlyStructs[0]);
-            if(methodsVisitor.NonReadonlyMethods.Count == 0)
-                return;
-
-            Counter+= methodsVisitor.NonReadonlyMethods.Count;
-            //Console.WriteLine(filePath);
-            //Console.WriteLine(String.Join(Environment.NewLine, methodsVisitor.NonReadonlyMethods));
         }
     }
 }
