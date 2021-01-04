@@ -10,15 +10,34 @@ namespace ReadonlyMarker
 {
     public class Program
     {
+        public static int Counter = 0;
         public static void Main(string[] args)
         {
-            var path = "D:\\Vector4.cs";
-            var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(path));
+            var path = "D:\\Development\\VisualStudio\\OpenSource\\runtime\\src\\libraries";
+            foreach (String file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories))
+            {
+                CheckFile(file);
+            }
+
+            Console.WriteLine(Counter);
+        }
+
+        private static void CheckFile(string filePath)
+        {
+            var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(filePath));
             var structVisitor = new StructVisitor();
             structVisitor.Visit(tree.GetRoot());
+            if(structVisitor.NonReadoblyStructs.Count == 0)
+                return;
 
             var methodsVisitor = new NonReadonlyStructMethodsVisitor();
             methodsVisitor.Visit(structVisitor.NonReadoblyStructs[0]);
+            if(methodsVisitor.NonReadonlyMethods.Count == 0)
+                return;
+
+            Counter+= methodsVisitor.NonReadonlyMethods.Count;
+            //Console.WriteLine(filePath);
+            //Console.WriteLine(String.Join(Environment.NewLine, methodsVisitor.NonReadonlyMethods));
         }
     }
 }
