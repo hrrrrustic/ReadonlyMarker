@@ -1,20 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ReadonlyMarker
 {
-    public class ReadonlyChecker
+    public class ReadonlyMarker
     {
         private CSharpCompilation _fileCompilation;
         private SemanticModel _semantic;
 
+        private readonly List<(MethodDeclarationSyntax old, MethodDeclarationSyntax update)> _changedMethods = new List<(MethodDeclarationSyntax old, MethodDeclarationSyntax update)>();
         private readonly string _filePath;
 
-        public ReadonlyChecker(String filePath)
+        public ReadonlyMarker(String filePath)
         {
             _filePath = filePath;
         }
@@ -25,39 +28,43 @@ namespace ReadonlyMarker
             var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(_filePath));
             _fileCompilation = CSharpCompilation.Create(null).AddSyntaxTrees(tree);
             _semantic = _fileCompilation.GetSemanticModel(tree);
-            var structs = GetNonReadOnlyStructs(tree.GetRoot());
+            var root = tree.GetRoot();
+            var structs = GetNonReadOnlyStructs(root);
             foreach (var @struct in structs)
                 CheckStruct(@struct);
+
+            if(_changedMethods.Count == 0)
+                return;
+
+            SyntaxNode newRoot = root
+                .ReplaceNodes(_changedMethods.Select(k => k.old),
+                    (syntax, declarationSyntax) => _changedMethods.First(k => k.old == syntax).update).NormalizeWhitespace();
+            Console.WriteLine(newRoot.ToFullString());
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
         {
             var methods = GetNonReadOnlyMethods(currentStruct);
             foreach (MethodDeclarationSyntax method in methods)
-            {
-                if (CheckMethod(method))
-                {
-                    Console.WriteLine(_filePath);
-                    Console.WriteLine(currentStruct.Identifier.ToFullString());
-                    Console.WriteLine(method);
-                    Console.WriteLine("==========================");
-                    Console.ReadKey();
-                }
-
-            }
+                CheckMethod(method);
         }
 
-        private bool CheckMethod(MethodDeclarationSyntax method)
+        private void CheckMethod(MethodDeclarationSyntax method)
         {
             var filter = new MethodFilterVisitor(_semantic);
             filter.Visit(method);
             if (filter.ValidMethod)
             {
-                MethodCount++;
-                return true;
-            }
+                var newMethod = method
+                    .WithModifiers(SyntaxFactory
+                        .TokenList(method
+                            .Modifiers
+                            .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword))))
+                    .NormalizeWhitespace();
 
-            return false;
+                _changedMethods.Add((method, newMethod));
+                MethodCount++;
+            }
         }
 
         private List<StructDeclarationSyntax> GetNonReadOnlyStructs(SyntaxNode node)

@@ -30,7 +30,7 @@ namespace ReadonlyMarker
 
         public override void VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
         {
-            if(node.OperatorToken.Kind() is not SyntaxKind.PreDecrementExpression or SyntaxKind.PreIncrementExpression)
+            if(node.OperatorToken.Kind() is not (SyntaxKind.PreDecrementExpression or SyntaxKind.PreIncrementExpression))
                 return;
 
             if (IsFieldOrProperty(_semantic.GetSymbolInfo(node.Operand)))
