@@ -11,7 +11,7 @@ namespace ReadonlyMarker
 
         public override void VisitStructDeclaration(StructDeclarationSyntax node)
         {
-            if (node.Modifiers.Any(k => k.ValueText == "readonly"))
+            if (node.Modifiers.Any(k => k.ValueText == "readonly" || k.ValueText == "unsafe"))
                 return;
 
             NonReadonlyStructs.Add(node);

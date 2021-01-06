@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Runtime.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,8 +14,7 @@ namespace ReadonlyMarker
                 .WithModifiers(SyntaxFactory
                     .TokenList(method
                         .Modifiers
-                        .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword))))
-                .NormalizeWhitespace();
+                        .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword).WithTrailingTrivia(SyntaxFactory.Space))));
         }
     }
 }

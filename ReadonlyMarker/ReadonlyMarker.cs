@@ -26,6 +26,7 @@ namespace ReadonlyMarker
         }
 
         public int MethodCount { get; private set; }
+
         public void MarkFile()
         {
             var root = _tree.GetRoot();
@@ -34,18 +35,36 @@ namespace ReadonlyMarker
             foreach (var @struct in structs)
                 CheckStruct(@struct);
 
-            if(_changedMethods.Count == 0)
+            if (_changedMethods.Count == 0)
                 return;
 
-            /*SyntaxNode newRoot = root
-                .ReplaceNodes(_changedMethods.Select(k => k.old),
-                    (syntax, declarationSyntax) => _changedMethods.First(k => k.old == syntax).update).NormalizeWhitespace();
-
             Console.WriteLine(_filePath);
-            Console.WriteLine();
-            Console.WriteLine(newRoot.ToFullString());
-            Console.ReadKey();
-            Console.Clear();*/
+            root
+                .DescendantNodes()
+                .OfType<StructDeclarationSyntax>()
+                .ToList()
+                .Select(k => k
+                    .RemoveNodes(k
+                        .DescendantNodes()
+                        .OfType<MethodDeclarationSyntax>()
+                        .Where(e => e.Modifiers.Any(x => x.ValueText == "static"))
+                        .Select(e => (SyntaxNode) e)
+                        .Union(k
+                            .DescendantNodes()
+                            .OfType<PropertyDeclarationSyntax>()
+                            .Where(e => e.Modifiers.Any(x => x.ValueText == "static")))
+                        .Select(e => (SyntaxNode) e), SyntaxRemoveOptions.KeepNoTrivia))
+                .ToList()
+                .ForEach(k => Console.WriteLine(k.ToFullString()));
+
+            var newRoot = root
+                .ReplaceNodes(_changedMethods
+                    .Select(k => k.old), 
+                    (syntax, declarationSyntax) => _changedMethods
+                        .First(k => k.old == syntax)
+                        .update
+                        .WithLeadingTrivia(syntax.GetLeadingTrivia()));
+            File.WriteAllText(_filePath, newRoot.ToFullString());
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
@@ -75,7 +94,7 @@ namespace ReadonlyMarker
             return structVisitor.NonReadonlyStructs;
         }
 
-        private List<MethodDeclarationSyntax> GetNonReadOnlyMethods(SyntaxNode node)
+        private List<MethodDeclarationSyntax> GetNonReadOnlyMethods(SyntaxNode node)    
         {
             var methodsVisitor = new NonReadonlyStructMethodsVisitor();
             methodsVisitor.Visit(node);

@@ -16,7 +16,10 @@ namespace ReadonlyMarker
 
         public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
         {
-            CheckAssignment(node);
+            var type = _semantic.GetSymbolInfo(node.Left);
+            if (IsFieldOrProperty(type))
+                if (!node.Ancestors().OfType<InitializerExpressionSyntax>().Any())
+                    IsValidMethod = false;
         }
 
         public override void VisitPostfixUnaryExpression(PostfixUnaryExpressionSyntax node)
@@ -39,17 +42,22 @@ namespace ReadonlyMarker
 
         public override void VisitInvocationExpression(InvocationExpressionSyntax node)
         {
+            base.VisitInvocationExpression(node);
             var invokeArguments = node.ArgumentList.Arguments;
             if (invokeArguments.Any(k => k.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) && IsFieldOrProperty(_semantic.GetSymbolInfo(k))))
                 IsValidMethod = false;
         }
 
-        private void CheckAssignment(AssignmentExpressionSyntax node)
+        public override void VisitThrowExpression(ThrowExpressionSyntax node)
         {
-            var type = _semantic.GetSymbolInfo(node.Left);
-            if (IsFieldOrProperty(type))
-                if(!node.Ancestors().OfType<InitializerExpressionSyntax>().Any())
-                    IsValidMethod = false;
+            if (node.Parent?.Parent is MethodDeclarationSyntax)
+                IsValidMethod = false;
+        }
+
+        public override void VisitThrowStatement(ThrowStatementSyntax node)
+        {
+            if (node.Parent?.Parent is MethodDeclarationSyntax)
+                IsValidMethod = false;
         }
 
         private bool IsFieldOrProperty(SymbolInfo symbol)

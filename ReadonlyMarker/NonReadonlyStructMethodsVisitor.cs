@@ -13,7 +13,7 @@ namespace ReadonlyMarker
         public int MethodCount => NonReadonlyGetters.Count + NonReadonlyMethods.Count;
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
-            if (node.Modifiers.Any(k => k.ValueText == "readonly" || k.ValueText == "static"))
+            if (node.Modifiers.Any(k => k.ValueText == "readonly" || k.ValueText == "static" || k.ValueText == "unsafe"))
                 return;
 
             NonReadonlyMethods.Add(node);

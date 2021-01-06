@@ -18,6 +18,11 @@ namespace ReadonlyMarker
 
         public bool CheckFullMethod(MethodDeclarationSyntax method)
         {
+            var t = method
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .ToList();
+
             var invokedMethods = method
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
