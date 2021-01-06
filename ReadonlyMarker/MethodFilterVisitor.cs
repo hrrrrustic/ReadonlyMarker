@@ -8,7 +8,7 @@ namespace ReadonlyMarker
     public class MethodFilterVisitor : CSharpSyntaxWalker
     {
         private readonly SemanticModel _semantic;
-        public bool ValidMethod { get; private set; } = true;
+        public bool IsValidMethod { get; private set; } = true;
         public MethodFilterVisitor(SemanticModel semantic)
         {
             _semantic = semantic;
@@ -21,39 +21,48 @@ namespace ReadonlyMarker
 
         public override void VisitPostfixUnaryExpression(PostfixUnaryExpressionSyntax node)
         {
-            if (node.OperatorToken.Kind() == SyntaxKind.SuppressNullableWarningExpression)
+            if (!IsIncrementOrDecrement(node.OperatorToken))
                 return;
 
             if (IsFieldOrProperty(_semantic.GetSymbolInfo(node.Operand)))
-                ValidMethod = false;
+                IsValidMethod = false;
         }
 
         public override void VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
         {
-            if(node.OperatorToken.Kind() is not (SyntaxKind.PreDecrementExpression or SyntaxKind.PreIncrementExpression))
+            if(!IsIncrementOrDecrement(node.OperatorToken))
                 return;
 
             if (IsFieldOrProperty(_semantic.GetSymbolInfo(node.Operand)))
-                ValidMethod = false;
+                IsValidMethod = false;
         }
 
         public override void VisitInvocationExpression(InvocationExpressionSyntax node)
         {
             var invokeArguments = node.ArgumentList.Arguments;
             if (invokeArguments.Any(k => k.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) && IsFieldOrProperty(_semantic.GetSymbolInfo(k))))
-                ValidMethod = false;
+                IsValidMethod = false;
         }
 
         private void CheckAssignment(AssignmentExpressionSyntax node)
         {
             var type = _semantic.GetSymbolInfo(node.Left);
             if (IsFieldOrProperty(type))
-                ValidMethod = false;
+                if(!node.Ancestors().OfType<InitializerExpressionSyntax>().Any())
+                    IsValidMethod = false;
         }
 
         private bool IsFieldOrProperty(SymbolInfo symbol)
         {
             if (symbol.Symbol is null || symbol.Symbol.Kind == SymbolKind.Field || symbol.Symbol.Kind == SymbolKind.Property)
+                return true;
+
+            return false;
+        }
+
+        private bool IsIncrementOrDecrement(SyntaxToken token)
+        {
+            if (token.Kind() is (SyntaxKind.PlusPlusToken or SyntaxKind.MinusToken))
                 return true;
 
             return false;

@@ -11,35 +11,41 @@ namespace ReadonlyMarker
 {
     public class ReadonlyMarker
     {
-        private CSharpCompilation _fileCompilation;
-        private SemanticModel _semantic;
+        private readonly SemanticModel _semantic;
 
+        private readonly SyntaxTree _tree;
         private readonly List<(MethodDeclarationSyntax old, MethodDeclarationSyntax update)> _changedMethods = new List<(MethodDeclarationSyntax old, MethodDeclarationSyntax update)>();
         private readonly string _filePath;
 
         public ReadonlyMarker(String filePath)
         {
             _filePath = filePath;
+            _tree = CSharpSyntaxTree.ParseText(File.ReadAllText(_filePath));
+            CSharpCompilation fileCompilation = CSharpCompilation.Create(null).AddSyntaxTrees(_tree);
+            _semantic = fileCompilation.GetSemanticModel(_tree);
         }
 
         public int MethodCount { get; private set; }
-        public void CheckFile()
+        public void MarkFile()
         {
-            var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(_filePath));
-            _fileCompilation = CSharpCompilation.Create(null).AddSyntaxTrees(tree);
-            _semantic = _fileCompilation.GetSemanticModel(tree);
-            var root = tree.GetRoot();
+            var root = _tree.GetRoot();
             var structs = GetNonReadOnlyStructs(root);
+
             foreach (var @struct in structs)
                 CheckStruct(@struct);
 
             if(_changedMethods.Count == 0)
                 return;
 
-            SyntaxNode newRoot = root
+            /*SyntaxNode newRoot = root
                 .ReplaceNodes(_changedMethods.Select(k => k.old),
                     (syntax, declarationSyntax) => _changedMethods.First(k => k.old == syntax).update).NormalizeWhitespace();
+
+            Console.WriteLine(_filePath);
+            Console.WriteLine();
             Console.WriteLine(newRoot.ToFullString());
+            Console.ReadKey();
+            Console.Clear();*/
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
@@ -51,17 +57,12 @@ namespace ReadonlyMarker
 
         private void CheckMethod(MethodDeclarationSyntax method)
         {
-            var filter = new MethodFilterVisitor(_semantic);
-            filter.Visit(method);
-            if (filter.ValidMethod)
-            {
-                var newMethod = method
-                    .WithModifiers(SyntaxFactory
-                        .TokenList(method
-                            .Modifiers
-                            .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword))))
-                    .NormalizeWhitespace();
+            var checker = new ReadonlyChecker(_semantic);
+            var result = checker.CheckFullMethod(method);
 
+            if (result)
+            {
+                var newMethod = method.AsReadOnlyMethod();
                 _changedMethods.Add((method, newMethod));
                 MethodCount++;
             }

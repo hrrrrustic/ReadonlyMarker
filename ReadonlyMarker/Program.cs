@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,18 +14,18 @@ namespace ReadonlyMarker
         public static void Main(string[] args)
         {
             var path = "D:\\Development\\VisualStudio\\OpenSource\\runtime\\src\\libraries";
-            var Counter = 0;
+            var counter = 0;
             foreach (String file in Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories))
             {
-                if(file.Contains("\\ref\\"))
+                if(file.Contains("\\ref\\") || file.Contains("\\tests\\"))
                     continue;
 
-                var checker = new ReadonlyChecker(file);
-                checker.CheckFile();
-                Counter += checker.MethodCount;
+                var checker = new ReadonlyMarker(file);
+                checker.MarkFile();
+                counter += checker.MethodCount;
             }
 
-            Console.WriteLine(Counter);
+            Console.WriteLine(counter);
         }
     }
 }
