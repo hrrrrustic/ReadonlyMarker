@@ -17,63 +17,58 @@ namespace ReadonlyMarker
         public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
         {
             var type = _semantic.GetSymbolInfo(node.Left);
-            if (IsFieldOrProperty(type))
-                if (!node.Ancestors().OfType<InitializerExpressionSyntax>().Any())
-                    IsValidMethod = false;
+            if (!IsFieldOrPropertyOrUndefined(type)) 
+                return;
+
+            if (!node.Ancestors().OfType<InitializerExpressionSyntax>().Any())
+                IsValidMethod = false;
         }
 
         public override void VisitPostfixUnaryExpression(PostfixUnaryExpressionSyntax node)
         {
-            if (!IsIncrementOrDecrement(node.OperatorToken))
-                return;
-
-            if (IsFieldOrProperty(_semantic.GetSymbolInfo(node.Operand)))
-                IsValidMethod = false;
+            CheckIncrementOrDecrement(node.Operand, node.OperatorToken);
         }
 
         public override void VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
         {
-            if(!IsIncrementOrDecrement(node.OperatorToken))
-                return;
-
-            if (IsFieldOrProperty(_semantic.GetSymbolInfo(node.Operand)))
-                IsValidMethod = false;
+            CheckIncrementOrDecrement(node.Operand, node.OperatorToken);
         }
 
         public override void VisitInvocationExpression(InvocationExpressionSyntax node)
         {
             base.VisitInvocationExpression(node);
             var invokeArguments = node.ArgumentList.Arguments;
-            if (invokeArguments.Any(k => k.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) && IsFieldOrProperty(_semantic.GetSymbolInfo(k))))
+            if (invokeArguments.Any(k => k.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) && IsFieldOrPropertyOrUndefined(_semantic.GetSymbolInfo(k))))
                 IsValidMethod = false;
         }
 
         public override void VisitThrowExpression(ThrowExpressionSyntax node)
         {
-            if (node.Parent?.Parent is MethodDeclarationSyntax)
-                IsValidMethod = false;
+            CheckMethodContainsOnlyThrowing(node);
         }
 
         public override void VisitThrowStatement(ThrowStatementSyntax node)
         {
-            if (node.Parent?.Parent is MethodDeclarationSyntax)
+            CheckMethodContainsOnlyThrowing(node);
+        }
+
+        private void CheckMethodContainsOnlyThrowing(SyntaxNode throwing)
+        {
+            if (throwing.Parent?.Parent is MethodDeclarationSyntax)
                 IsValidMethod = false;
         }
+        private bool IsFieldOrPropertyOrUndefined(SymbolInfo symbol) 
+            => symbol.Symbol is null || symbol.Symbol.Kind == SymbolKind.Field || symbol.Symbol.Kind == SymbolKind.Property;
 
-        private bool IsFieldOrProperty(SymbolInfo symbol)
+        private void CheckIncrementOrDecrement(ExpressionSyntax operand, SyntaxToken operation)
         {
-            if (symbol.Symbol is null || symbol.Symbol.Kind == SymbolKind.Field || symbol.Symbol.Kind == SymbolKind.Property)
-                return true;
+            if (!IsIncrementOrDecrementOperation(operation))
+                return;
 
-            return false;
+            if (IsFieldOrPropertyOrUndefined(_semantic.GetSymbolInfo(operand)))
+                IsValidMethod = false;
         }
-
-        private bool IsIncrementOrDecrement(SyntaxToken token)
-        {
-            if (token.Kind() is (SyntaxKind.PlusPlusToken or SyntaxKind.MinusToken))
-                return true;
-
-            return false;
-        }
+        private bool IsIncrementOrDecrementOperation(SyntaxToken token) 
+            => token.Kind() is (SyntaxKind.PlusPlusToken or SyntaxKind.MinusToken);
     }
 }

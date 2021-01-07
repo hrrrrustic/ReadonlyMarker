@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -11,12 +10,9 @@ namespace ReadonlyMarker
 {
     public class ReadonlyMarker
     {
-        private readonly SemanticModel _semantic;
-
         private readonly SyntaxTree _tree;
         private readonly List<(SyntaxNode old, SyntaxNode update)> _changedMethods = new();
         private readonly string _filePath;
-
         private readonly ReadonlyChecker _checker;
 
         public ReadonlyMarker(String filePath)
@@ -24,8 +20,8 @@ namespace ReadonlyMarker
             _filePath = filePath;
             _tree = CSharpSyntaxTree.ParseText(File.ReadAllText(_filePath));
             CSharpCompilation fileCompilation = CSharpCompilation.Create(null).AddSyntaxTrees(_tree);
-            _semantic = fileCompilation.GetSemanticModel(_tree);
-            _checker = new ReadonlyChecker(_semantic);
+            SemanticModel semantic = fileCompilation.GetSemanticModel(_tree);
+            _checker = new ReadonlyChecker(semantic);
         }
 
         public int MethodCount => _changedMethods.Count;
@@ -33,9 +29,8 @@ namespace ReadonlyMarker
         public void MarkFile()
         {
             var root = _tree.GetRoot();
-            var structs = GetNonReadOnlyStructs(root);
 
-            foreach (var @struct in structs)
+            foreach (var @struct in GetNonReadOnlyStructs(root))
                 CheckStruct(@struct);
 
             if (_changedMethods.Count == 0)
@@ -44,41 +39,32 @@ namespace ReadonlyMarker
             var newRoot = root
                 .ReplaceNodes(_changedMethods
                     .Select(k => k.old), 
-                    (syntax, declarationSyntax) => _changedMethods
+                    (syntax, _) => _changedMethods
                         .First(k => k.old == syntax)
                         .update
                         .WithLeadingTrivia(syntax.GetLeadingTrivia()));
             File.WriteAllText(_filePath, newRoot.ToFullString());
-            Console.WriteLine();
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
         {
-            var methods = GetNonReadOnlyMethods(currentStruct);
-            foreach (MethodDeclarationSyntax method in methods)
+            foreach (MethodDeclarationSyntax method in GetNonReadOnlyMethods(currentStruct))
                 MarkMethod(method);
 
-            var getters = GetNonReadOnlyGetters(currentStruct);
-            foreach (var getter in getters)
+            foreach (var getter in GetNonReadOnlyGetters(currentStruct))
                 MarkGetter(getter);
         }
 
         private void MarkMethod(MethodDeclarationSyntax method)
         {
             if (_checker.CheckMethod(method))
-            {
-                var newMethod = method.AsReadOnlyMethod();
-                _changedMethods.Add((method, newMethod));
-            }
+                _changedMethods.Add((method, method.AsReadOnlyMethod()));
         }
         
         private void MarkGetter(AccessorDeclarationSyntax getter)
         {
             if (_checker.CheckGetter(getter))
-            {
-                var newGetter = getter.AsReadOnlyGetter();
-                _changedMethods.Add((getter, newGetter));
-            }
+                _changedMethods.Add((getter, getter.AsReadOnlyGetter()));
         }
 
         private List<StructDeclarationSyntax> GetNonReadOnlyStructs(SyntaxNode node)
