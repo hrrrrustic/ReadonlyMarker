@@ -13,7 +13,7 @@ namespace ReadonlyMarker
         public int MethodCount => NonReadonlyGetters.Count + NonReadonlyMethods.Count;
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
-            if (node.Modifiers.Any(k => k.ValueText == "readonly" || k.ValueText == "static" || k.ValueText == "unsafe"))
+            if (node.Modifiers.HasReadOnlyModifier() || node.Modifiers.HasUnsafeModifier() || node.Modifiers.HasStaticModifier())
                 return;
 
             NonReadonlyMethods.Add(node);
@@ -27,10 +27,10 @@ namespace ReadonlyMarker
             if (node.Keyword.ValueText == "set")
                 return;
 
-            if (property.Modifiers.Any(k => k.ValueText == "static"))
+            if (property.Modifiers.HasStaticModifier())
                 return;
             
-            if (node.Modifiers.Any(k => k.ValueText == "readonly"))
+            if (node.Modifiers.HasReadOnlyModifier())
                 return;
 
             NonReadonlyGetters.Add(node);

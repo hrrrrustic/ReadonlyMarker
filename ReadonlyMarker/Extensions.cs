@@ -16,5 +16,29 @@ namespace ReadonlyMarker
                         .Modifiers
                         .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword).WithTrailingTrivia(SyntaxFactory.Space))));
         }
+
+        public static AccessorDeclarationSyntax AsReadOnlyGetter(this AccessorDeclarationSyntax getter)
+        {
+            return getter
+                .WithModifiers(SyntaxFactory
+                    .TokenList(getter
+                        .Modifiers
+                        .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword).WithTrailingTrivia(SyntaxFactory.Space))));
+        }
+
+        public static bool HasStaticModifier(this SyntaxTokenList tokens)
+        {
+            return tokens.Any(k => k.ValueText == "static");
+        }
+
+        public static bool HasReadOnlyModifier(this SyntaxTokenList tokens)
+        {
+            return tokens.Any(k => k.ValueText == "readonly");
+        }
+
+        public static bool HasUnsafeModifier(this SyntaxTokenList tokens)
+        {
+            return tokens.Any(k => k.ValueText == "unsafe");
+        }
     }
 }

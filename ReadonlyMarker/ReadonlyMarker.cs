@@ -14,8 +14,10 @@ namespace ReadonlyMarker
         private readonly SemanticModel _semantic;
 
         private readonly SyntaxTree _tree;
-        private readonly List<(MethodDeclarationSyntax old, MethodDeclarationSyntax update)> _changedMethods = new List<(MethodDeclarationSyntax old, MethodDeclarationSyntax update)>();
+        private readonly List<(SyntaxNode old, SyntaxNode update)> _changedMethods = new();
         private readonly string _filePath;
+
+        private readonly ReadonlyChecker _checker;
 
         public ReadonlyMarker(String filePath)
         {
@@ -23,9 +25,10 @@ namespace ReadonlyMarker
             _tree = CSharpSyntaxTree.ParseText(File.ReadAllText(_filePath));
             CSharpCompilation fileCompilation = CSharpCompilation.Create(null).AddSyntaxTrees(_tree);
             _semantic = fileCompilation.GetSemanticModel(_tree);
+            _checker = new ReadonlyChecker(_semantic);
         }
 
-        public int MethodCount { get; private set; }
+        public int MethodCount => _changedMethods.Count;
 
         public void MarkFile()
         {
@@ -38,25 +41,6 @@ namespace ReadonlyMarker
             if (_changedMethods.Count == 0)
                 return;
 
-            Console.WriteLine(_filePath);
-            root
-                .DescendantNodes()
-                .OfType<StructDeclarationSyntax>()
-                .ToList()
-                .Select(k => k
-                    .RemoveNodes(k
-                        .DescendantNodes()
-                        .OfType<MethodDeclarationSyntax>()
-                        .Where(e => e.Modifiers.Any(x => x.ValueText == "static"))
-                        .Select(e => (SyntaxNode) e)
-                        .Union(k
-                            .DescendantNodes()
-                            .OfType<PropertyDeclarationSyntax>()
-                            .Where(e => e.Modifiers.Any(x => x.ValueText == "static")))
-                        .Select(e => (SyntaxNode) e), SyntaxRemoveOptions.KeepNoTrivia))
-                .ToList()
-                .ForEach(k => Console.WriteLine(k.ToFullString()));
-
             var newRoot = root
                 .ReplaceNodes(_changedMethods
                     .Select(k => k.old), 
@@ -65,25 +49,35 @@ namespace ReadonlyMarker
                         .update
                         .WithLeadingTrivia(syntax.GetLeadingTrivia()));
             File.WriteAllText(_filePath, newRoot.ToFullString());
+            Console.WriteLine();
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
         {
             var methods = GetNonReadOnlyMethods(currentStruct);
             foreach (MethodDeclarationSyntax method in methods)
-                CheckMethod(method);
+                MarkMethod(method);
+
+            var getters = GetNonReadOnlyGetters(currentStruct);
+            foreach (var getter in getters)
+                MarkGetter(getter);
         }
 
-        private void CheckMethod(MethodDeclarationSyntax method)
+        private void MarkMethod(MethodDeclarationSyntax method)
         {
-            var checker = new ReadonlyChecker(_semantic);
-            var result = checker.CheckFullMethod(method);
-
-            if (result)
+            if (_checker.CheckMethod(method))
             {
                 var newMethod = method.AsReadOnlyMethod();
                 _changedMethods.Add((method, newMethod));
-                MethodCount++;
+            }
+        }
+        
+        private void MarkGetter(AccessorDeclarationSyntax getter)
+        {
+            if (_checker.CheckGetter(getter))
+            {
+                var newGetter = getter.AsReadOnlyGetter();
+                _changedMethods.Add((getter, newGetter));
             }
         }
 
@@ -94,11 +88,18 @@ namespace ReadonlyMarker
             return structVisitor.NonReadonlyStructs;
         }
 
-        private List<MethodDeclarationSyntax> GetNonReadOnlyMethods(SyntaxNode node)    
+        private List<MethodDeclarationSyntax> GetNonReadOnlyMethods(StructDeclarationSyntax node)    
         {
             var methodsVisitor = new NonReadonlyStructMethodsVisitor();
             methodsVisitor.Visit(node);
             return methodsVisitor.NonReadonlyMethods;
+        }
+
+        private List<AccessorDeclarationSyntax> GetNonReadOnlyGetters(StructDeclarationSyntax node)
+        {
+            var methodsVisitor = new NonReadonlyStructMethodsVisitor();
+            methodsVisitor.Visit(node);
+            return methodsVisitor.NonReadonlyGetters;
         }
     }
 }

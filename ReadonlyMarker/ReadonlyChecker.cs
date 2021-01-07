@@ -16,38 +16,71 @@ namespace ReadonlyMarker
             _model = model;
         }
 
-        public bool CheckFullMethod(MethodDeclarationSyntax method)
+        public bool CheckGetter(AccessorDeclarationSyntax getter)
         {
-            var t = method
-                .DescendantNodes()
-                .OfType<InvocationExpressionSyntax>()
-                .ToList();
+            if (!PropertyHasSetter(getter))
+                return false;
 
-            var invokedMethods = method
+            if (!CheckInnerMethods(getter))
+                return false;
+
+            return InternalCheckGetter(getter);
+        }
+
+        private bool PropertyHasSetter(AccessorDeclarationSyntax getter)
+        {
+            return getter
+                .Ancestors()
+                .OfType<PropertyDeclarationSyntax>()
+                .First()
+                .DescendantNodes()
+                .OfType<AccessorDeclarationSyntax>()
+                .Count() == 2;
+        }
+
+        public bool CheckMethod(MethodDeclarationSyntax method)
+        {
+            if (!CheckInnerMethods(method))
+                return false;
+
+            return InternalCheckMethod(method);
+        }
+
+        private bool CheckInnerMethods(SyntaxNode node)
+        {
+            var invokedMethods = node
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
-                .Select(k => ModelExtensions.GetSymbolInfo(_model, k).Symbol as IMethodSymbol)
+                .Select(k => _model.GetSymbolInfo(k).Symbol as IMethodSymbol)
                 .Select(k => k?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as MethodDeclarationSyntax)
                 .Where(k => k is not null)
                 .ToList();
 
-            var innerResult = invokedMethods
-                .Select(CheckMethod)
+            return invokedMethods
+                .Select(InternalCheckMethod)
                 .All(k => k);
-
-            if (!innerResult)
-                return false;
-
-            return CheckMethod(method);
         }
 
-        private bool CheckMethod(MethodDeclarationSyntax method)
+        private bool InternalCheckGetter(AccessorDeclarationSyntax getter)
         {
-            if (method.Modifiers.Any(k => k.ValueText == "readonly"))
-                return true;
+            if (getter.Modifiers.HasReadOnlyModifier())
+                return false;
 
+            return FilterMethod(getter);
+        }
+
+        private bool InternalCheckMethod(MethodDeclarationSyntax method)
+        {
+            if (method.Modifiers.HasReadOnlyModifier())
+                return false;
+
+            return FilterMethod(method);
+        }
+
+        private bool FilterMethod(SyntaxNode node)
+        {
             var filter = new MethodFilterVisitor(_model);
-            filter.Visit(method);
+            filter.Visit(node);
 
             return filter.IsValidMethod;
         }
