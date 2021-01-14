@@ -7,21 +7,23 @@ namespace ReadonlyMarker
 {
     public static class Extensions
     {
-        public static MethodDeclarationSyntax AsReadOnlyMethod(this MethodDeclarationSyntax method) =>
-            method
-                .WithModifiers(AddReadOnlyModifier(method.Modifiers));
+        public static MethodDeclarationSyntax AsReadOnlyMethod(this MethodDeclarationSyntax method)
+        {
+            return method
+                .WithModifiers(SyntaxFactory
+                    .TokenList(method
+                        .Modifiers
+                        .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword).WithTrailingTrivia(SyntaxFactory.Space))));
+        }
 
-        public static AccessorDeclarationSyntax AsReadOnlyGetter(this AccessorDeclarationSyntax getter) =>
-            getter
-                .WithModifiers(AddReadOnlyModifier(getter.Modifiers));
-
-        private static SyntaxTokenList AddReadOnlyModifier(SyntaxTokenList modifiers)
-            => SyntaxFactory
-                .TokenList(modifiers
-                    .Append(SyntaxFactory
-                        .Token(SyntaxKind.ReadOnlyKeyword)
-                        .WithLeadingTrivia(SyntaxFactory.Space)
-                        .WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space)));
+        public static AccessorDeclarationSyntax AsReadOnlyGetter(this AccessorDeclarationSyntax getter)
+        {
+            return getter
+                .WithModifiers(SyntaxFactory
+                    .TokenList(getter
+                        .Modifiers
+                        .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword))));
+        }
         public static bool HasStaticModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "static");
         public static bool HasReadOnlyModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "readonly");
         public static bool HasUnsafeModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "unsafe");
