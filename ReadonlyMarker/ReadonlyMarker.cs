@@ -14,7 +14,6 @@ namespace ReadonlyMarker
         private readonly List<(SyntaxNode old, SyntaxNode update)> _changedMethods = new();
         private readonly string _filePath;
         private readonly ReadonlyChecker _checker;
-
         public ReadonlyMarker(String filePath)
         {
             _filePath = filePath;
@@ -44,6 +43,7 @@ namespace ReadonlyMarker
                         .update
                         .WithLeadingTrivia(syntax.GetLeadingTrivia()));
             File.WriteAllText(_filePath, newRoot.ToFullString());
+            return;
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)

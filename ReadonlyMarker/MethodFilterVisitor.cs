@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,6 +11,14 @@ namespace ReadonlyMarker
     {
         private readonly SemanticModel _semantic;
         public bool IsValidMethod { get; private set; } = true;
+
+        private readonly HashSet<String> _bannedMethods = new HashSet<String>()
+        {
+            "Add", "Append", "Remove", 
+            "Push", "Queue", "Sort", 
+            "Pop", "Dequeue", "Clear", 
+            "Insert", "AddRange"
+        };
         public MethodFilterVisitor(SemanticModel semantic)
         {
             _semantic = semantic;
@@ -39,6 +49,15 @@ namespace ReadonlyMarker
             base.VisitInvocationExpression(node);
             var invokeArguments = node.ArgumentList.Arguments;
             if (invokeArguments.Any(k => k.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) && IsFieldOrPropertyOrUndefined(_semantic.GetSymbolInfo(k))))
+                IsValidMethod = false;
+
+            var methodName = node
+                .DescendantNodes()
+                .OfType<IdentifierNameSyntax>()
+                .Take(2)
+                .Select(k => k.Identifier.ToString().Trim());
+
+            if (methodName.Any(k => _bannedMethods.Contains(k)))
                 IsValidMethod = false;
         }
 

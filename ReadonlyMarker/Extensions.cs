@@ -15,12 +15,13 @@ namespace ReadonlyMarker
             getter
                 .WithModifiers(AddReadOnlyModifier(getter.Modifiers));
 
-        private static SyntaxTokenList AddReadOnlyModifier(SyntaxTokenList modifiers) 
+        private static SyntaxTokenList AddReadOnlyModifier(SyntaxTokenList modifiers)
             => SyntaxFactory
                 .TokenList(modifiers
                     .Append(SyntaxFactory
                         .Token(SyntaxKind.ReadOnlyKeyword)
-                        .WithLeadingTrivia(SyntaxFactory.Space)));
+                        .WithLeadingTrivia(SyntaxFactory.Space)
+                        .WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space).WithLeadingTrivia(SyntaxFactory.Space)));
         public static bool HasStaticModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "static");
         public static bool HasReadOnlyModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "readonly");
         public static bool HasUnsafeModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "unsafe");
