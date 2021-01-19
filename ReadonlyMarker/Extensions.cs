@@ -7,23 +7,32 @@ namespace ReadonlyMarker
 {
     public static class Extensions
     {
-        public static MethodDeclarationSyntax AsReadOnlyMethod(this MethodDeclarationSyntax method)
-        {
-            return method
-                .WithModifiers(SyntaxFactory
-                    .TokenList(method
-                        .Modifiers
-                        .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword).WithTrailingTrivia(SyntaxFactory.Space))));
-        }
+        public static MethodDeclarationSyntax AsReadOnlyMethod(this MethodDeclarationSyntax method) 
+            => method
+                .WithModifiers(method.Modifiers.WithReadonly());
 
-        public static AccessorDeclarationSyntax AsReadOnlyGetter(this AccessorDeclarationSyntax getter)
-        {
-            return getter
-                .WithModifiers(SyntaxFactory
-                    .TokenList(getter
-                        .Modifiers
-                        .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword))));
-        }
+        public static AccessorDeclarationSyntax AsReadOnlyGetter(this AccessorDeclarationSyntax getter) 
+            => getter
+                .WithModifiers(getter.Modifiers.WithReadonly());
+
+        public static PropertyDeclarationSyntax AsReadOnlyProperty(this PropertyDeclarationSyntax property) 
+            => property
+                .WithModifiers(property.Modifiers.WithReadonly());
+
+        private static SyntaxTokenList WithReadonly(this SyntaxTokenList modifiers) 
+            => SyntaxFactory
+                .TokenList(modifiers
+                    .Append(SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword).WithTrailingTrivia(SyntaxFactory.Space)));
+
+        public static bool HasSetter(this PropertyDeclarationSyntax property) 
+            => property
+                .DescendantNodes()
+                .OfType<AccessorDeclarationSyntax>()
+                .Count() == 2;
+
+        public static bool HasSetter(this AccessorDeclarationSyntax getter)
+            => HasSetter(getter.Ancestors().OfType<PropertyDeclarationSyntax>().First());
+
         public static bool HasStaticModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "static");
         public static bool HasReadOnlyModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "readonly");
         public static bool HasUnsafeModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "unsafe");

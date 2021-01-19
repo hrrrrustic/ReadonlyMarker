@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -42,17 +43,29 @@ namespace ReadonlyMarker
                         .First(k => k.old == syntax)
                         .update
                         .WithLeadingTrivia(syntax.GetLeadingTrivia()));
-            File.WriteAllText(_filePath, newRoot.ToFullString());
+            var value = newRoot.ToFullString();
+            if(_changedMethods.Any(k => k.old is AccessorDeclarationSyntax))
+                value = Regex.Replace(value, "readonly\\s+get", "readonly get", RegexOptions.Compiled);
+
+            File.WriteAllText(_filePath, value);
             return;
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
         {
-            foreach (MethodDeclarationSyntax method in GetNonReadOnlyMethods(currentStruct))
-                MarkMethod(method);
+            //foreach (MethodDeclarationSyntax method in GetNonReadOnlyMethods(currentStruct))
+            //MarkMethod(method);
 
             foreach (var getter in GetNonReadOnlyGetters(currentStruct))
-                MarkGetter(getter);
+            {
+                if(getter.HasSetter())
+                    MarkGetter(getter);
+                else
+                    MarkProperty(getter.Ancestors().OfType<PropertyDeclarationSyntax>().First());
+            }
+
+            //foreach (var arrowedProperties in GetArrowedProperties(currentStruct))
+                //MarkProperty(arrowedProperties);
         }
 
         private void MarkMethod(MethodDeclarationSyntax method)
@@ -65,6 +78,15 @@ namespace ReadonlyMarker
         {
             if (_checker.CheckGetter(getter))
                 _changedMethods.Add((getter, getter.AsReadOnlyGetter()));
+        }
+
+        private void MarkProperty(PropertyDeclarationSyntax property)
+        {
+            if (property is null)
+                return;
+
+            if(_checker.CheckArrowedProperty(property))
+                _changedMethods.Add((property, property.AsReadOnlyProperty()));
         }
 
         private List<StructDeclarationSyntax> GetNonReadOnlyStructs(SyntaxNode node)
@@ -86,6 +108,13 @@ namespace ReadonlyMarker
             var methodsVisitor = new NonReadonlyStructMethodsVisitor();
             methodsVisitor.Visit(node);
             return methodsVisitor.NonReadonlyGetters;
+        }
+
+        private List<PropertyDeclarationSyntax> GetArrowedProperties(StructDeclarationSyntax node)
+        {
+            var methodsVisitor = new NonReadonlyStructMethodsVisitor();
+            methodsVisitor.Visit(node);
+            return methodsVisitor.ArrowedProperties;
         }
     }
 }

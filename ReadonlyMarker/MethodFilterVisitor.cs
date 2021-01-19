@@ -73,21 +73,27 @@ namespace ReadonlyMarker
 
         private void CheckMethodContainsOnlyThrowing(SyntaxNode throwing)
         {
-            if (throwing.Parent?.Parent is MethodDeclarationSyntax)
-                IsValidMethod = false;
+            if (throwing.Parent?.Parent is MethodDeclarationSyntax method)
+            {
+                var children = method
+                    .DescendantNodes(k => k is not (ThrowExpressionSyntax or ThrowStatementSyntax));
+
+                if(children.Count() == 1)
+                    IsValidMethod = false;
+            }
         }
         private bool IsFieldOrPropertyOrUndefined(SymbolInfo symbol) 
             => symbol.Symbol is null || symbol.Symbol.Kind == SymbolKind.Field || symbol.Symbol.Kind == SymbolKind.Property;
 
         private void CheckIncrementOrDecrement(ExpressionSyntax operand, SyntaxToken operation)
         {
-            if (!IsIncrementOrDecrementOperation(operation))
+            if (!IsUnaryChangingValueOperation(operation))
                 return;
 
             if (IsFieldOrPropertyOrUndefined(_semantic.GetSymbolInfo(operand)))
                 IsValidMethod = false;
         }
-        private bool IsIncrementOrDecrementOperation(SyntaxToken token) 
-            => token.Kind() is (SyntaxKind.PlusPlusToken or SyntaxKind.MinusToken);
+        private bool IsUnaryChangingValueOperation(SyntaxToken token) 
+            => token.Kind() is (SyntaxKind.PlusPlusToken or SyntaxKind.MinusMinusToken or SyntaxKind.MinusEqualsToken or SyntaxKind.PlusEqualsToken);
     }
 }

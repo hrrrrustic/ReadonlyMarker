@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,25 +11,46 @@ namespace ReadonlyMarker
     {
         private readonly SemanticModel _model;
 
+        private readonly HashSet<String> _bannedMethods = new HashSet<String>()
+        {
+            "Dispose"
+        };
         public ReadonlyChecker(SemanticModel model)
         {
             _model = model;
         }
 
-        public bool CheckGetter(AccessorDeclarationSyntax getter) 
-            => PropertyHasSetter(getter) && (CheckInnerMethods(getter) && InternalCheckGetter(getter));
+        public bool CheckArrowedProperty(PropertyDeclarationSyntax property)
+        {
+            if (property.Modifiers.HasReadOnlyModifier() && property.Modifiers.HasStaticModifier())
+                return false;
 
-        private bool PropertyHasSetter(AccessorDeclarationSyntax getter) 
-            => getter
-                .Ancestors()
-                .OfType<PropertyDeclarationSyntax>()
-                .First()
-                .DescendantNodes()
-                .OfType<AccessorDeclarationSyntax>()
-                .Count() == 2;
+            var accessorCount = property.DescendantNodes().OfType<AccessorDeclarationSyntax>().Count();
+            if (accessorCount == 2)
+                return false;
+
+            if (accessorCount == 1)
+            {
+                return FilterMethod(property
+                    .DescendantNodes()
+                    .OfType<AccessorDeclarationSyntax>()
+                    .First());
+            }
+
+            return FilterMethod(property
+                .ChildNodes()
+                .OfType<ArrowExpressionClauseSyntax>()
+                .First());
+        }
+
+        public bool CheckGetter(AccessorDeclarationSyntax getter) 
+            => getter.HasSetter() && CheckInnerMethods(getter) && InternalCheckGetter(getter);
 
         public bool CheckMethod(MethodDeclarationSyntax method) 
-            => CheckInnerMethods(method) && InternalCheckMethod(method);
+            => !_bannedMethods.Contains(method
+                    .Identifier
+                    .ToString()
+                    .Trim()) && CheckInnerMethods(method) && InternalCheckMethod(method);
 
         private bool CheckInnerMethods(SyntaxNode node) =>
             node

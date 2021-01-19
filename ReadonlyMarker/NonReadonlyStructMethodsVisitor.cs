@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -10,6 +11,7 @@ namespace ReadonlyMarker
     {
         public readonly List<MethodDeclarationSyntax> NonReadonlyMethods = new();
         public readonly List<AccessorDeclarationSyntax> NonReadonlyGetters = new();
+        public readonly List<PropertyDeclarationSyntax> ArrowedProperties = new();
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
             if(node.ExplicitInterfaceSpecifier is not null)
@@ -27,24 +29,50 @@ namespace ReadonlyMarker
             if (attributes.Contains("obsolete"))
                 return;
 
+            if (IsInNestedClass(node))
+                return;
+
             NonReadonlyMethods.Add(node);
         }
 
-        public override void VisitAccessorDeclaration(AccessorDeclarationSyntax node)
+        private bool IsInNestedClass(MethodDeclarationSyntax node)
         {
-            if(node?.Parent?.Parent is not PropertyDeclarationSyntax property)
+            SyntaxNode currentNode = node;
+            while (true)
+            {
+                if (currentNode is null)
+                    return true;
+
+                if (currentNode is StructDeclarationSyntax)
+                    return false;
+
+                if (currentNode is ClassDeclarationSyntax)
+                    return true;
+
+                currentNode = currentNode.Parent;
+            }
+        }
+
+        public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
+        {
+            if (node.Modifiers.HasStaticModifier() || node.Modifiers.HasReadOnlyModifier())
                 return;
 
-            if(property.DescendantNodes().OfType<AccessorDeclarationSyntax>().Count() == 1)
-                return;
+            var getter = node.DescendantNodes().OfType<AccessorDeclarationSyntax>().FirstOrDefault();
 
-            if (!node.DescendantNodes().Any())
-                return;
+            if (getter is not null)
+            {
+                if (getter.Modifiers.HasReadOnlyModifier())
+                    return;
 
-            if (node.Keyword.ValueText == "set" || property.Modifiers.HasStaticModifier() || node.Modifiers.HasReadOnlyModifier())
-                return;
+                if (!getter.DescendantNodes().Any())
+                    return;
 
-            NonReadonlyGetters.Add(node);
+                NonReadonlyGetters.Add(getter);
+            }
+
+            if (node.ChildNodes().Skip(1).First() is ArrowExpressionClauseSyntax)
+                ArrowedProperties.Add(node);
         }
     }
 }
