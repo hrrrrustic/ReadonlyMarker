@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -35,7 +35,7 @@ namespace ReadonlyMarker
 
             if (_changedMethods.Count == 0)
                 return;
-
+            
             var newRoot = root
                 .ReplaceNodes(_changedMethods
                     .Select(k => k.old), 
@@ -45,16 +45,23 @@ namespace ReadonlyMarker
                         .WithLeadingTrivia(syntax.GetLeadingTrivia()));
             var value = newRoot.ToFullString();
             if(_changedMethods.Any(k => k.old is AccessorDeclarationSyntax))
-                value = Regex.Replace(value, "readonly\\s+get", "readonly get", RegexOptions.Compiled);
+              value = Regex.Replace(value, "readonly\\s+get", "readonly get", RegexOptions.Compiled);
 
             File.WriteAllText(_filePath, value);
-            return;
+            Console.WriteLine($"Ignore {_filePath} ?");
+            var res = Console.ReadKey().KeyChar;
+            Console.WriteLine();
+            if (res == 'y')
+            {
+                File.AppendAllLines("IgnoreStructs.txt", new List<String> {_filePath});
+                File.WriteAllText(_filePath, root.ToFullString());
+            }
         }
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
         {
-            //foreach (MethodDeclarationSyntax method in GetNonReadOnlyMethods(currentStruct))
-            //MarkMethod(method);
+            foreach (MethodDeclarationSyntax method in GetNonReadOnlyMethods(currentStruct))
+             MarkMethod(method);
 
             foreach (var getter in GetNonReadOnlyGetters(currentStruct))
             {
@@ -64,8 +71,8 @@ namespace ReadonlyMarker
                     MarkProperty(getter.Ancestors().OfType<PropertyDeclarationSyntax>().First());
             }
 
-            //foreach (var arrowedProperties in GetArrowedProperties(currentStruct))
-                //MarkProperty(arrowedProperties);
+            foreach (var arrowedProperties in GetArrowedProperties(currentStruct))
+                MarkProperty(arrowedProperties);
         }
 
         private void MarkMethod(MethodDeclarationSyntax method)

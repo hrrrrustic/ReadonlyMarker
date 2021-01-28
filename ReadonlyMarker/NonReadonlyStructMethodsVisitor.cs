@@ -35,8 +35,11 @@ namespace ReadonlyMarker
             NonReadonlyMethods.Add(node);
         }
 
-        private bool IsInNestedClass(MethodDeclarationSyntax node)
+        private bool IsInNestedClass(SyntaxNode node)
         {
+            if (!node.Ancestors().OfType<ClassDeclarationSyntax>().Any())
+                return false;
+
             SyntaxNode currentNode = node;
             while (true)
             {
@@ -56,6 +59,9 @@ namespace ReadonlyMarker
         public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
         {
             if (node.Modifiers.HasStaticModifier() || node.Modifiers.HasReadOnlyModifier())
+                return;
+
+            if(IsInNestedClass(node))
                 return;
 
             var getter = node.DescendantNodes().OfType<AccessorDeclarationSyntax>().FirstOrDefault();

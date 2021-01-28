@@ -15,6 +15,8 @@ namespace ReadonlyMarker
         {
             "Dispose"
         };
+
+        private readonly Dictionary<SyntaxNode, bool> _checkedNodes = new Dictionary<SyntaxNode, Boolean>();
         public ReadonlyChecker(SemanticModel model)
         {
             _model = model;
@@ -22,7 +24,7 @@ namespace ReadonlyMarker
 
         public bool CheckArrowedProperty(PropertyDeclarationSyntax property)
         {
-            if (property.Modifiers.HasReadOnlyModifier() && property.Modifiers.HasStaticModifier())
+            if (property.ExplicitInterfaceSpecifier is not null || property.Modifiers.HasReadOnlyModifier() || property.Modifiers.HasStaticModifier())
                 return false;
 
             var accessorCount = property.DescendantNodes().OfType<AccessorDeclarationSyntax>().Count();
@@ -44,13 +46,24 @@ namespace ReadonlyMarker
         }
 
         public bool CheckGetter(AccessorDeclarationSyntax getter) 
-            => getter.HasSetter() && CheckInnerMethods(getter) && InternalCheckGetter(getter);
+            => getter.HasSetter() && CheckNode(getter);
 
         public bool CheckMethod(MethodDeclarationSyntax method) 
             => !_bannedMethods.Contains(method
                     .Identifier
                     .ToString()
-                    .Trim()) && CheckInnerMethods(method) && InternalCheckMethod(method);
+                    .Trim()) && CheckNode(method);
+
+        private bool CheckNode(SyntaxNode node)
+        {
+            if (_checkedNodes.ContainsKey(node))
+                return _checkedNodes[node];
+
+            _checkedNodes.Add(node, true);
+            var res = CheckInnerMethods(node) && InternalCheckNode(node);
+            _checkedNodes[node] = res;
+            return res;
+        }
 
         private bool CheckInnerMethods(SyntaxNode node) =>
             node
@@ -59,15 +72,19 @@ namespace ReadonlyMarker
                 .Select(k => _model.GetSymbolInfo(k).Symbol as IMethodSymbol)
                 .Select(k => k?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as MethodDeclarationSyntax)
                 .Where(k => k is not null)
-                .Select(InternalCheckMethod)
+                .Select(CheckNode)
                 .All(k => k);
 
-        private bool InternalCheckGetter(AccessorDeclarationSyntax getter) 
-            => !getter.Modifiers.HasReadOnlyModifier() && FilterMethod(getter);
+        private bool InternalCheckNode(SyntaxNode node)
+        {
+            if (node is AccessorDeclarationSyntax accessor)
+                return accessor.Modifiers.HasReadOnlyModifier() && FilterMethod(accessor);
 
-        private bool InternalCheckMethod(MethodDeclarationSyntax method) 
-            => !method.Modifiers.HasReadOnlyModifier() && FilterMethod(method);
+            if(node is MethodDeclarationSyntax method)
+                return !(method.Modifiers.HasReadOnlyModifier() || method.ExplicitInterfaceSpecifier is not null) && FilterMethod(method);
 
+            return false;
+        }
         private bool FilterMethod(SyntaxNode node)
         {
             var filter = new MethodFilterVisitor(_model);

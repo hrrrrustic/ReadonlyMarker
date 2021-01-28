@@ -17,7 +17,7 @@ namespace ReadonlyMarker
             "Add", "Append", "Remove", 
             "Push", "Queue", "Sort", 
             "Pop", "Dequeue", "Clear", 
-            "Insert", "AddRange"
+            "Insert", "AddRange", "Dispose"
         };
         public MethodFilterVisitor(SemanticModel semantic)
         {
