@@ -41,6 +41,7 @@ namespace ReadonlyMarker
 
         public override void VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
         {
+            base.VisitPrefixUnaryExpression(node);
             CheckIncrementOrDecrement(node.Operand, node.OperatorToken);
         }
 
@@ -49,7 +50,10 @@ namespace ReadonlyMarker
             base.VisitInvocationExpression(node);
             var invokeArguments = node.ArgumentList.Arguments;
             if (invokeArguments.Any(k => k.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) && IsFieldOrPropertyOrUndefined(_semantic.GetSymbolInfo(k))))
+            {
                 IsValidMethod = false;
+                return;
+            }
 
             var methodName = node
                 .DescendantNodes()
@@ -63,24 +67,20 @@ namespace ReadonlyMarker
 
         public override void VisitThrowExpression(ThrowExpressionSyntax node)
         {
-            CheckMethodContainsOnlyThrowing(node);
+            if (node.Parent?.Parent is not MethodDeclarationSyntax method)
+                return;
+
+            if (method.ChildNodes().OfType<ArrowExpressionClauseSyntax>().First().ChildNodes().Count() == 1)
+                IsValidMethod = false;
         }
 
         public override void VisitThrowStatement(ThrowStatementSyntax node)
         {
-            CheckMethodContainsOnlyThrowing(node);
-        }
+            if(node.Parent?.Parent is not MethodDeclarationSyntax method)
+                return;
 
-        private void CheckMethodContainsOnlyThrowing(SyntaxNode throwing)
-        {
-            if (throwing.Parent?.Parent is MethodDeclarationSyntax method)
-            {
-                var children = method
-                    .DescendantNodes(k => k is not (ThrowExpressionSyntax or ThrowStatementSyntax));
-
-                if(children.Count() == 1)
-                    IsValidMethod = false;
-            }
+            if (method.ChildNodes().OfType<BlockSyntax>().First().ChildNodes().Count() == 1)
+                IsValidMethod = false;
         }
         private bool IsFieldOrPropertyOrUndefined(SymbolInfo symbol) 
             => symbol.Symbol is null || symbol.Symbol.Kind == SymbolKind.Field || symbol.Symbol.Kind == SymbolKind.Property;

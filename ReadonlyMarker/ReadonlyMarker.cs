@@ -61,11 +61,11 @@ namespace ReadonlyMarker
         private void CheckStruct(StructDeclarationSyntax currentStruct)
         {
             foreach (MethodDeclarationSyntax method in GetNonReadOnlyMethods(currentStruct))
-             MarkMethod(method);
+                MarkMethod(method);
 
             foreach (var getter in GetNonReadOnlyGetters(currentStruct))
             {
-                if(getter.HasSetter())
+                if(getter.PropertyHasSetter())
                     MarkGetter(getter);
                 else
                     MarkProperty(getter.Ancestors().OfType<PropertyDeclarationSyntax>().First());

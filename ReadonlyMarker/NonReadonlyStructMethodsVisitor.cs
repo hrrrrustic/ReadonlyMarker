@@ -71,8 +71,8 @@ namespace ReadonlyMarker
                 if (getter.Modifiers.HasReadOnlyModifier())
                     return;
 
-                if (!getter.DescendantNodes().Any())
-                    return;
+                //if (!getter.DescendantNodes().Any())
+                    //return;
 
                 NonReadonlyGetters.Add(getter);
             }

@@ -30,7 +30,7 @@ namespace ReadonlyMarker
                 .OfType<AccessorDeclarationSyntax>()
                 .Count() == 2;
 
-        public static bool HasSetter(this AccessorDeclarationSyntax getter)
+        public static bool PropertyHasSetter(this AccessorDeclarationSyntax getter)
             => HasSetter(getter.Ancestors().OfType<PropertyDeclarationSyntax>().First());
 
         public static bool HasStaticModifier(this SyntaxTokenList tokens) => HasModifier(tokens, "static");

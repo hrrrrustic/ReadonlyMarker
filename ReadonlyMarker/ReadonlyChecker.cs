@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -33,20 +34,20 @@ namespace ReadonlyMarker
 
             if (accessorCount == 1)
             {
-                return FilterMethod(property
+                return CheckNode(property
                     .DescendantNodes()
                     .OfType<AccessorDeclarationSyntax>()
                     .First());
             }
 
-            return FilterMethod(property
+            return CheckNode(property
                 .ChildNodes()
                 .OfType<ArrowExpressionClauseSyntax>()
                 .First());
         }
 
         public bool CheckGetter(AccessorDeclarationSyntax getter) 
-            => getter.HasSetter() && CheckNode(getter);
+            => getter.PropertyHasSetter() && CheckNode(getter);
 
         public bool CheckMethod(MethodDeclarationSyntax method) 
             => !_bannedMethods.Contains(method
@@ -78,7 +79,7 @@ namespace ReadonlyMarker
         private bool InternalCheckNode(SyntaxNode node)
         {
             if (node is AccessorDeclarationSyntax accessor)
-                return accessor.Modifiers.HasReadOnlyModifier() && FilterMethod(accessor);
+                return !accessor.Modifiers.HasReadOnlyModifier() && FilterMethod(accessor);
 
             if(node is MethodDeclarationSyntax method)
                 return !(method.Modifiers.HasReadOnlyModifier() || method.ExplicitInterfaceSpecifier is not null) && FilterMethod(method);
