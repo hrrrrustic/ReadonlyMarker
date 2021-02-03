@@ -29,23 +29,38 @@ namespace ReadonlyMarker
         public void MarkFile()
         {
             var root = _tree.GetRoot();
-
             foreach (var @struct in GetNonReadOnlyStructs(root))
                 CheckStruct(@struct);
 
             if (_changedMethods.Count == 0)
                 return;
-            
+
             var newRoot = root
                 .ReplaceNodes(_changedMethods
                     .Select(k => k.old), 
                     (syntax, _) => _changedMethods
                         .First(k => k.old == syntax)
                         .update
-                        .WithLeadingTrivia(syntax.GetLeadingTrivia()));
+                        .WithLeadingTrivia(syntax.GetLeadingTrivia())
+                        .WithTrailingTrivia(syntax.GetTrailingTrivia()));
+
             var value = newRoot.ToFullString();
-            if(_changedMethods.Any(k => k.old is AccessorDeclarationSyntax))
-              value = Regex.Replace(value, "readonly\\s+get", "readonly get", RegexOptions.Compiled);
+            /*if (_changedMethods.Any(k => k.old is AccessorDeclarationSyntax))
+                value = Regex.Replace(value, "readonly\\s+get", "readonly get");
+
+            if (_changedMethods.Any(k => k.old is PropertyDeclarationSyntax {ExplicitInterfaceSpecifier: { }} or MethodDeclarationSyntax { ExplicitInterfaceSpecifier: { } }))
+                value = ReplaceExtraLine(value);*/
+
+            static string ReplaceExtraLine(string value)
+            {
+                string pattern = $"readonly {Environment.NewLine}(.+{Environment.NewLine})";
+                var matches = Regex.Matches(value, pattern);
+                foreach (Match match in matches)
+                    value = value.Replace(match.Value, "readonly " + match.Groups[1].Value.TrimStart());
+
+                return value;
+            }
+
 
             File.WriteAllText(_filePath, value);
             Console.WriteLine($"Ignore {_filePath} ?");
@@ -64,12 +79,7 @@ namespace ReadonlyMarker
                 MarkMethod(method);
 
             foreach (var getter in GetNonReadOnlyGetters(currentStruct))
-            {
-                if(getter.PropertyHasSetter())
-                    MarkGetter(getter);
-                else
-                    MarkProperty(getter.Ancestors().OfType<PropertyDeclarationSyntax>().First());
-            }
+                MarkGetter(getter);
 
             foreach (var arrowedProperties in GetArrowedProperties(currentStruct))
                 MarkProperty(arrowedProperties);
@@ -77,13 +87,16 @@ namespace ReadonlyMarker
 
         private void MarkMethod(MethodDeclarationSyntax method)
         {
-            if (_checker.CheckMethod(method))
+            if(method.Identifier.ToString().Contains("CompareTo"))
+                Console.WriteLine();
+
+            if (_checker.CanBeMarkedAsReadOnly(method))
                 _changedMethods.Add((method, method.AsReadOnlyMethod()));
         }
         
         private void MarkGetter(AccessorDeclarationSyntax getter)
         {
-            if (_checker.CheckGetter(getter))
+            if (_checker.CanBeMarkedAsReadOnly(getter))
                 _changedMethods.Add((getter, getter.AsReadOnlyGetter()));
         }
 
@@ -92,7 +105,7 @@ namespace ReadonlyMarker
             if (property is null)
                 return;
 
-            if(_checker.CheckArrowedProperty(property))
+            if(_checker.CanBeMarkedAsReadOnly(property))
                 _changedMethods.Add((property, property.AsReadOnlyProperty()));
         }
 

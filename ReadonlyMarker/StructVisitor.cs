@@ -10,7 +10,7 @@ namespace ReadonlyMarker
 
         public override void VisitStructDeclaration(StructDeclarationSyntax node)
         {
-            if (node.Modifiers.HasReadOnlyModifier() || node.Modifiers.HasUnsafeModifier())
+            if (node.HasReadOnlyModifier() || node.HasUnsafeModifier())
                 return;
 
             NonReadonlyStructs.Add(node);

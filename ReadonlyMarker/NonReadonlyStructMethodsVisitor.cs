@@ -14,19 +14,7 @@ namespace ReadonlyMarker
         public readonly List<PropertyDeclarationSyntax> ArrowedProperties = new();
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
-            if(node.ExplicitInterfaceSpecifier is not null)
-                return;
-
-            if (node.Modifiers.HasReadOnlyModifier() || node.Modifiers.HasUnsafeModifier() || node.Modifiers.HasStaticModifier())
-                return;
-
-            var attributes = node
-                .AttributeLists
-                .SelectMany(k => k.Attributes)
-                .Select(k => k.Name.ToString().Trim().ToLower())
-                .ToList();
-
-            if (attributes.Contains("obsolete"))
+            if (node.HasReadOnlyModifier() || node.HasUnsafeModifier() || node.HasStaticModifier())
                 return;
 
             if (IsInNestedClass(node))
@@ -58,7 +46,7 @@ namespace ReadonlyMarker
 
         public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
         {
-            if (node.Modifiers.HasStaticModifier() || node.Modifiers.HasReadOnlyModifier())
+            if (node.HasStaticModifier() || node.HasReadOnlyModifier())
                 return;
 
             if(IsInNestedClass(node))
@@ -68,13 +56,14 @@ namespace ReadonlyMarker
 
             if (getter is not null)
             {
-                if (getter.Modifiers.HasReadOnlyModifier())
+                if (getter.HasReadOnlyModifier())
                     return;
 
-                //if (!getter.DescendantNodes().Any())
-                    //return;
-
-                NonReadonlyGetters.Add(getter);
+                if (node.HasSetter())
+                {
+                    NonReadonlyGetters.Add(getter);
+                    return;
+                }
             }
 
             if (node.ChildNodes().Skip(1).First() is ArrowExpressionClauseSyntax)

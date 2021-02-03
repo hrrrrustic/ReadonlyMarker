@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -26,9 +26,15 @@ namespace ReadonlyMarker
 
         public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
         {
+            base.VisitAssignmentExpression(node);
+
             var type = _semantic.GetSymbolInfo(node.Left);
-            if (!IsFieldOrPropertyOrUndefined(type)) 
+            if (IsFieldOrPropertyOrUndefined(type))
+            {
+                IsValidMethod = false;
                 return;
+            }
+
 
             if (!node.Ancestors().OfType<InitializerExpressionSyntax>().Any())
                 IsValidMethod = false;
@@ -36,6 +42,7 @@ namespace ReadonlyMarker
 
         public override void VisitPostfixUnaryExpression(PostfixUnaryExpressionSyntax node)
         {
+            base.VisitPostfixUnaryExpression(node);
             CheckIncrementOrDecrement(node.Operand, node.OperatorToken);
         }
 
@@ -48,6 +55,7 @@ namespace ReadonlyMarker
         public override void VisitInvocationExpression(InvocationExpressionSyntax node)
         {
             base.VisitInvocationExpression(node);
+
             var invokeArguments = node.ArgumentList.Arguments;
             if (invokeArguments.Any(k => k.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) && IsFieldOrPropertyOrUndefined(_semantic.GetSymbolInfo(k))))
             {
@@ -82,6 +90,7 @@ namespace ReadonlyMarker
             if (method.ChildNodes().OfType<BlockSyntax>().First().ChildNodes().Count() == 1)
                 IsValidMethod = false;
         }
+
         private bool IsFieldOrPropertyOrUndefined(SymbolInfo symbol) 
             => symbol.Symbol is null || symbol.Symbol.Kind == SymbolKind.Field || symbol.Symbol.Kind == SymbolKind.Property;
 
