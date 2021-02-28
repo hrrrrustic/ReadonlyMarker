@@ -45,11 +45,11 @@ namespace ReadonlyMarker
                         .WithTrailingTrivia(syntax.GetTrailingTrivia()));
 
             var value = newRoot.ToFullString();
-            /*if (_changedMethods.Any(k => k.old is AccessorDeclarationSyntax))
+            if (_changedMethods.Any(k => k.old is AccessorDeclarationSyntax))
                 value = Regex.Replace(value, "readonly\\s+get", "readonly get");
 
             if (_changedMethods.Any(k => k.old is PropertyDeclarationSyntax {ExplicitInterfaceSpecifier: { }} or MethodDeclarationSyntax { ExplicitInterfaceSpecifier: { } }))
-                value = ReplaceExtraLine(value);*/
+                value = ReplaceExtraLine(value);
 
             static string ReplaceExtraLine(string value)
             {
@@ -60,7 +60,6 @@ namespace ReadonlyMarker
 
                 return value;
             }
-
 
             File.WriteAllText(_filePath, value);
             Console.WriteLine($"Ignore {_filePath} ?");
@@ -75,21 +74,29 @@ namespace ReadonlyMarker
 
         private void CheckStruct(StructDeclarationSyntax currentStruct)
         {
-            foreach (MethodDeclarationSyntax method in GetNonReadOnlyMethods(currentStruct))
+            var nodes = new NonReadonlyStructMethodsVisitor().GetPotentialNodes(currentStruct);
+
+            foreach (MethodDeclarationSyntax method in nodes.NonReadonlyMethods)
                 MarkMethod(method);
 
-            foreach (var getter in GetNonReadOnlyGetters(currentStruct))
+            foreach (var getter in nodes.NonReadonlyGetters)
                 MarkGetter(getter);
 
-            foreach (var arrowedProperties in GetArrowedProperties(currentStruct))
+            foreach (var arrowedProperties in nodes.ArrowedProperties)
                 MarkProperty(arrowedProperties);
+
+            foreach (var indexer in nodes.Indexers)
+                MarkIndexer(indexer);
+        }
+
+        private void MarkIndexer(IndexerDeclarationSyntax indexer)
+        {
+            if(_checker.CanBeMarkedAsReadOnly(indexer))
+                _changedMethods.Add((indexer, indexer.AsReadonlyIndexer()));
         }
 
         private void MarkMethod(MethodDeclarationSyntax method)
         {
-            if(method.Identifier.ToString().Contains("CompareTo"))
-                Console.WriteLine();
-
             if (_checker.CanBeMarkedAsReadOnly(method))
                 _changedMethods.Add((method, method.AsReadOnlyMethod()));
         }
@@ -102,9 +109,6 @@ namespace ReadonlyMarker
 
         private void MarkProperty(PropertyDeclarationSyntax property)
         {
-            if (property is null)
-                return;
-
             if(_checker.CanBeMarkedAsReadOnly(property))
                 _changedMethods.Add((property, property.AsReadOnlyProperty()));
         }
@@ -114,27 +118,6 @@ namespace ReadonlyMarker
             var structVisitor = new StructVisitor();
             structVisitor.Visit(node);
             return structVisitor.NonReadonlyStructs;
-        }
-
-        private List<MethodDeclarationSyntax> GetNonReadOnlyMethods(StructDeclarationSyntax node)    
-        {
-            var methodsVisitor = new NonReadonlyStructMethodsVisitor();
-            methodsVisitor.Visit(node);
-            return methodsVisitor.NonReadonlyMethods;
-        }
-
-        private List<AccessorDeclarationSyntax> GetNonReadOnlyGetters(StructDeclarationSyntax node)
-        {
-            var methodsVisitor = new NonReadonlyStructMethodsVisitor();
-            methodsVisitor.Visit(node);
-            return methodsVisitor.NonReadonlyGetters;
-        }
-
-        private List<PropertyDeclarationSyntax> GetArrowedProperties(StructDeclarationSyntax node)
-        {
-            var methodsVisitor = new NonReadonlyStructMethodsVisitor();
-            methodsVisitor.Visit(node);
-            return methodsVisitor.ArrowedProperties;
         }
     }
 }

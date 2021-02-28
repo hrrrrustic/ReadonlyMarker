@@ -10,18 +10,21 @@ namespace ReadonlyMarker
     public class MethodFilterVisitor : CSharpSyntaxWalker
     {
         private readonly SemanticModel _semantic;
+        private readonly CheckedNodesCache _checkedNodes;
         public bool IsValidMethod { get; private set; } = true;
 
-        private readonly HashSet<String> _bannedMethods = new HashSet<String>()
+        private readonly HashSet<String> _bannedMethods = new()
         {
             "Add", "Append", "Remove", 
             "Push", "Queue", "Sort", 
             "Pop", "Dequeue", "Clear", 
-            "Insert", "AddRange", "Dispose"
+            "Insert", "AddRange", "Dispose",
+            "MoveNext", "Reset"
         };
-        public MethodFilterVisitor(SemanticModel semantic)
+        public MethodFilterVisitor(SemanticModel semantic, CheckedNodesCache checkedNodes)
         {
             _semantic = semantic;
+            _checkedNodes = checkedNodes;
         }
 
         public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
@@ -71,6 +74,50 @@ namespace ReadonlyMarker
 
             if (methodName.Any(k => _bannedMethods.Contains(k)))
                 IsValidMethod = false;
+
+            if(node.Expression is MemberAccessExpressionSyntax or MemberBindingExpressionSyntax)
+                return;
+
+            var method = _semantic.GetSymbolInfo(node).Symbol as IMethodSymbol;
+            if (method is null)
+            {
+                IsValidMethod = false;
+                return;
+            }
+
+            var references = method
+                .DeclaringSyntaxReferences
+                .Select(k => k.GetSyntax());
+
+            foreach (var syntaxNode in references)
+            {
+                if (_checkedNodes.TryGetValue(syntaxNode, out bool result))
+                {
+                    if(result)
+                        continue;
+
+                    IsValidMethod = false;
+                    return;
+                }
+
+                _checkedNodes.AddCurrentNode(syntaxNode);
+                var visitor = new MethodFilterVisitor(_semantic, _checkedNodes);
+                visitor.Visit(syntaxNode);
+
+                _checkedNodes.AddNode(syntaxNode, visitor.IsValidMethod);
+                if (!visitor.IsValidMethod)
+                {
+                    IsValidMethod = false;
+                    return;
+                }
+            }
+        }
+
+        public override void VisitIdentifierName(IdentifierNameSyntax node)
+        {
+            var property = _semantic.GetSymbolInfo(node).Symbol as IPropertySymbol;
+            if (property is null)
+                return;
         }
 
         public override void VisitThrowExpression(ThrowExpressionSyntax node)

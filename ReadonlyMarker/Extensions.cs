@@ -22,6 +22,16 @@ namespace ReadonlyMarker
             => getter
                 .WithModifiers(getter.Modifiers.WithReadonly());
 
+        public static IndexerDeclarationSyntax AsReadonlyIndexer(this IndexerDeclarationSyntax indexer)
+        {
+            if (indexer.ExplicitInterfaceSpecifier is null)
+                return indexer
+                    .WithModifiers(indexer.Modifiers.WithReadonly());
+
+            string type = indexer.Type.ToString();
+            return indexer.WithType(SyntaxFactory.ParseTypeName($"readonly {type}"));
+        }
+
         public static PropertyDeclarationSyntax AsReadOnlyProperty(this PropertyDeclarationSyntax property)
         {
             if(property.ExplicitInterfaceSpecifier is null)

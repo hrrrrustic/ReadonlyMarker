@@ -9,9 +9,16 @@ namespace ReadonlyMarker
 {
     public class NonReadonlyStructMethodsVisitor : CSharpSyntaxWalker
     {
-        public readonly List<MethodDeclarationSyntax> NonReadonlyMethods = new();
-        public readonly List<AccessorDeclarationSyntax> NonReadonlyGetters = new();
-        public readonly List<PropertyDeclarationSyntax> ArrowedProperties = new();
+        private readonly List<MethodDeclarationSyntax> _nonReadonlyMethods = new();
+        private readonly List<AccessorDeclarationSyntax> _nonReadonlyGetters = new();
+        private readonly List<PropertyDeclarationSyntax> _arrowedProperties = new();
+        private readonly List<IndexerDeclarationSyntax> _indexers = new();
+
+        public MatchedNodes GetPotentialNodes(SyntaxNode node)
+        {
+            Visit(node);
+            return new MatchedNodes(_nonReadonlyMethods, _nonReadonlyGetters, _arrowedProperties, _indexers);
+        }
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
             if (node.HasReadOnlyModifier() || node.HasUnsafeModifier() || node.HasStaticModifier())
@@ -20,7 +27,7 @@ namespace ReadonlyMarker
             if (IsInNestedClass(node))
                 return;
 
-            NonReadonlyMethods.Add(node);
+            _nonReadonlyMethods.Add(node);
         }
 
         private bool IsInNestedClass(SyntaxNode node)
@@ -44,6 +51,17 @@ namespace ReadonlyMarker
             }
         }
 
+        public override void VisitIndexerDeclaration(IndexerDeclarationSyntax node)
+        {
+            if (node.HasStaticModifier() || node.HasReadOnlyModifier())
+                return;
+
+            if (IsInNestedClass(node))
+                return;
+
+            _indexers.Add(node);
+        }
+
         public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
         {
             if (node.HasStaticModifier() || node.HasReadOnlyModifier())
@@ -61,13 +79,13 @@ namespace ReadonlyMarker
 
                 if (node.HasSetter())
                 {
-                    NonReadonlyGetters.Add(getter);
+                    _nonReadonlyGetters.Add(getter);
                     return;
                 }
             }
 
             if (node.ChildNodes().Skip(1).First() is ArrowExpressionClauseSyntax)
-                ArrowedProperties.Add(node);
+                _arrowedProperties.Add(node);
         }
     }
 }

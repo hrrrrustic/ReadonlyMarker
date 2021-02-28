@@ -12,10 +12,7 @@ namespace ReadonlyMarker
     public class ReadonlyChecker
     {
         private readonly SemanticModel _model;
-        private readonly Dictionary<SyntaxNode, bool> _checkedNodes = new Dictionary<SyntaxNode, Boolean>();
-
-        private readonly HashSet<string> _bannedMethods = new HashSet<String>()
-            {"Dispose "};
+        private readonly HashSet<string> _bannedMethods = new() {"Dispose"};
 
         public ReadonlyChecker(SemanticModel model)
         {
@@ -24,19 +21,16 @@ namespace ReadonlyMarker
 
         public bool CanBeMarkedAsReadOnly(MethodDeclarationSyntax method)
         {
-            if (method.HasReadOnlyModifier() || method.HasStaticModifier())
-                return false;
-
             var methodName = method.Identifier.ToString().Trim();
-            return !_bannedMethods.Contains(methodName) && CheckNode(method);
+            return !_bannedMethods.Contains(methodName) && InternalCanBeMarkedAsReadOnly(method);
         }
 
         public bool CanBeMarkedAsReadOnly(PropertyDeclarationSyntax property)
         {
-            if (property.HasReadOnlyModifier() || property.HasStaticModifier() || property.HasGetter())
+            if (property.HasGetter())
                 return false;
 
-            return CheckNode(property);
+            return InternalCanBeMarkedAsReadOnly(property);
         }
 
         public bool CanBeMarkedAsReadOnly(AccessorDeclarationSyntax accessor)
@@ -44,122 +38,45 @@ namespace ReadonlyMarker
             if (accessor.HasReadOnlyModifier() || accessor.IsSetter())
                 return false;
 
-            return CheckNode(accessor);
+            return IsSafeCall(accessor);
         }
 
         public bool CanBeMarkedAsReadOnly(IndexerDeclarationSyntax indexer)
         {
-            throw new NotImplementedException();
+            return InternalCanBeMarkedAsReadOnly(indexer);
         }
 
-        public bool IsSafeCall(InvocationExpressionSyntax invocation)
+        private bool InternalCanBeMarkedAsReadOnly(MemberDeclarationSyntax member)
         {
+            if (member.HasReadOnlyModifier() || member.HasStaticModifier())
+                return false;
 
-            return true;
-
-
+            return IsSafeCall(member);
         }
 
-        public bool IsSafeCall(MethodDeclarationSyntax methodCall)
+        private bool IsSafeCall(MemberDeclarationSyntax member)
         {
-            if (methodCall.HasReadOnlyModifier())
+            if (member.HasReadOnlyModifier())
                 return true;
 
-            return true;
+            return InternalCanBeMarkedAsReadOnly((SyntaxNode)member);
         }
 
-        public bool IsSafeCall(PropertyDeclarationSyntax propertyCall)
+        private bool IsSafeCall(AccessorDeclarationSyntax accessorCall)
         {
-            if (propertyCall.HasReadOnlyModifier())
+            if (accessorCall.HasReadOnlyModifier())
                 return true;
 
-            return true;
-
+            return InternalCanBeMarkedAsReadOnly(accessorCall);
         }
 
-        private bool CheckNode(SyntaxNode node)
+        private bool InternalCanBeMarkedAsReadOnly(SyntaxNode node)
         {
-            if (_checkedNodes.ContainsKey(node))
-                return _checkedNodes[node];
-
-            _checkedNodes.Add(node, true);
-            var res = CheckInnerMethods(node) && InternalCheckNode(node);
-            _checkedNodes[node] = res;
-            return res;
-        }
-
-        private bool CheckInnerMethods(SyntaxNode node)
-        {
-            var innerCalls = node
-                .DescendantNodes()
-                .OfType<InvocationExpressionSyntax>()
-                .Select(k => (k, _model.GetSymbolInfo(k).Symbol as IMethodSymbol));
-
-            foreach ((var expression, var method) in innerCalls)
-            {
-                if (!CanBeMarkedAsReadOnly(expression))
-                    return false;
-
-                if(method is null && expression.Expression is MemberAccessExpressionSyntax or MemberBindingExpressionSyntax)
-                    continue;
-
-                if (method is null)
-                    return false;
-
-                var references = method
-                    .DeclaringSyntaxReferences
-                    .Select(k => k.GetSyntax());
-
-                if (!references.Where(k => k is MethodDeclarationSyntax or PropertyDeclarationSyntax).All(CheckNode))
-                    return false;
-            }
-
-            var innerThisCalls = node
-                .DescendantNodes()
-                .OfType<ThisExpressionSyntax>()
-                .Where(k => k.Parent is MemberAccessExpressionSyntax)
-                .Select(k => k.Parent!.ChildNodes().OfType<IdentifierNameSyntax>().First())
-                .Select(k => _model.GetSymbolInfo(k).Symbol as IMethodSymbol);
-            
-            foreach (var method in innerThisCalls)
-            {
-                if (method is null)
-                    return false;
-
-                var innerResult = method
-                    .DeclaringSyntaxReferences
-                    .Select(k => k.GetSyntax())
-                    .Where(k => k is MethodDeclarationSyntax or PropertyDeclarationSyntax)
-                    .All(CheckNode);
-
-                if (!innerResult)
-                    return false;
-            }
-
-            return true;
-        }
-
-        private bool InternalCheckNode(SyntaxNode node)
-        {
-            if (node is AccessorDeclarationSyntax accessor)
-                return !accessor.HasReadOnlyModifier() && CanBeMarkedAsReadOnly((SyntaxNode) accessor);
-
-            if(node is MethodDeclarationSyntax method)
-                return !(method.HasReadOnlyModifier()/* || method.ExplicitInterfaceSpecifier is not null*/) && CanBeMarkedAsReadOnly((SyntaxNode) method);
-
-            throw new NotSupportedException();
-        }
-
-        private List<SyntaxNode> GetInnerCalls(SyntaxNode node)
-        {
-
-            return null;
-        }
-        private bool CanBeMarkedAsReadOnly(SyntaxNode node)
-        {
-            var filter = new MethodFilterVisitor(_model);
+            var cache = new CheckedNodesCache();
+            cache.AddCurrentNode(node);
+            var filter = new MethodFilterVisitor(_model, cache);
             filter.Visit(node);
-
+            cache.AddNode(node, filter.IsValidMethod);
             return filter.IsValidMethod;
         }
     }
